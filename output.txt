@@ -1,0 +1,65 @@
+------CPU------
+Architecture:x86_64
+Vendor ID: GenuineIntel
+Model name:Intel(R) Core(TM) i7-2630QM CPU @ 2.00GHz
+CPU max MHz:2900.0000
+CPU min MHz:800.0000
+------GPU------
+VGA compatible controller: Intel Corporation 2nd Generation Core Processor Family Integrated Graphics Controller (rev 09)
+VGA compatible controller: NVIDIA Corporation GF108M [GeForce GT 540M] (rev a1)
+------RAM------
+Size: 2048 MB
+Type: DDR3
+Speed: 1333 MHz
+Manufacturer: 06C1
+Serial Number: 000000B3
+Part Number: SSZ3128M8-EDJEF
+Size: 4096 MB
+Type: DDR3
+Speed: 1333 MHz
+Manufacturer: Kingston
+Serial Number: 103CD4C3
+Part Number: 99U5428-040.A00LF 
+Size: 2048 MB
+Type: DDR3
+Speed: 1333 MHz
+Manufacturer: 06C1
+Serial Number: 000000C0
+Part Number: SSZ3128M8-EDJEF
+------DISK------
+description: Windows NTFS volume
+serial: f88f-e704
+capacity: 500MiB
+description: Windows NTFS volume
+serial: dec293cc-fcdb-f745-858f-c6cc1e2f9e14
+capacity: 104GiB
+description: EXT4 volume
+vendor: Linux
+serial: 082e7830-3923-49ac-bb64-d015dad2dc2b
+capacity: 1GiB
+description: Extended partition
+capacity: 13GiB
+description: Linux LVM Physical Volume partition
+serial: YL0etS-3zNY-feCf-jH9a-ecfd-e7Tm-hwg0Xd
+capacity: 13GiB
+description: Windows NTFS volume
+serial: 44b15dba-f2be-1e4c-b5f4-abf9c416e811
+capacity: 100MiB
+description: Windows NTFS volume
+serial: 6c838769-35e0-8f49-b3ca-eb2e9d4cd88c
+capacity: 465GiB
+------MOTHERBOARD------
+Manufacturer: ASUSTeK Computer Inc.
+Product Name: N73SV
+Serial Number: NB-1234567890
+------SYSTEM------
+description: Notebook
+product: N73SV (To be filled by O.E.M.)
+vendor: ASUSTeK Computer Inc.
+serial: B3N0BC15818411G
+width: 64 bits
+------BIOS------
+Vendor: American Megatrends Inc.
+Version: N73SV.306
+Release Date: 08/18/2011
+BIOS Revision: 4.6

@@ -7,48 +7,53 @@
 
 enum parts { CPU, GPU, RAM, DISK, MOTHERBOARD, SYSTEM, BIOS };
 
-//"sudo lshw -short | grep system", "r");
-//"sudo cat /proc/cpuinfo | grep -E 'vendor|family|model|stepping|MHz|cache|flags'", "r");
-//"sudo dmidecode -t baseboard | grep -E 'Manufacturer|Product|Version|Serial'", "r");
-//"sudo  lshw -class volume | grep -E 'volume|description|vendor|logical|version|serial|size|capacity|configuration'", "r");
-//"sudo dmidecode -t bios | grep -E 'Vendor|Version|Date|Revision'","r");
-//"sudo dmidecode -t memory | grep -E 'Size:|Type:|Speed:|Manufacturer|Serial|Asset|Part'", "r");
-//"sudo lspci | grep -E -o '.{0,0}VGA.{0,200}'","r");
-//"sudo lspci | grep -E -o '.{0,0}Multimedia.{0,200}'","r");
-
 const char commands[][BUFFER_SIZE/4] =
 {
-    { "lscpu | grep -E 'Architecture|CPU(s)|Vendor ID|Model name|CPU MHz'" },
+    { "lscpu | grep -E 'Architecture|CPU(s)|Vendor ID|Model name|CPU min MHz|CPU max MHz'" },
     { "sudo lspci | grep -E -o '.{0,0}VGA.{0,200}'" },
     { "sudo dmidecode -t memory | grep -E 'Size:|Type:|Speed:|Manufacturer|Serial|Part'" },
-    { "sudo lshw -class volume | grep -E 'volume|description|vendor|serial|size|capacity|configuration'" },
+    { "sudo lshw -class volume | grep -E 'description|vendor|serial|capacity'" },
     { "sudo dmidecode -t baseboard | grep -E 'Product|Manufacturer|Serial'" },
-    { "sudo lshw -c system | grep -E 'product|vendor|serial|'" },
+    { "sudo lshw -c system | grep -E 'description|product|vendor|serial|width'" },
     { "sudo dmidecode -t bios | grep -E 'Vendor|Version|Date|Revision'" }
 };
 
 char computer[BIOS][BUFFER_SIZE];
 
+void replace(char *target, const char *needle, const char *replacement)
+{
+    char buffer[BUFFER_SIZE] = { 0 };
+    char *insert_point = &buffer[0];
+    const char *tmp = target;
+    size_t needle_len = strlen(needle);
+    size_t repl_len = strlen(replacement);
+
+    while (1) {
+        const char *p = strstr(tmp, needle);
+
+        if (p == NULL) {
+            strcpy(insert_point, tmp);
+            break;
+        }
+
+        memcpy(insert_point, tmp, p - tmp);
+        insert_point += p - tmp;
+
+        memcpy(insert_point, replacement, repl_len);
+        insert_point += repl_len;
+
+        tmp = p + needle_len;
+    }
+
+    strcpy(target, buffer);
+}
+
 char *clean(char *str)
 {
-    char *src, *dest;
-
-    src = dest = str;
-
-    while(*src != '\0')
-    {
-        if (*src != '\"' && *src != ',' && *src != '\t')
-        {
-            *dest = *src;
-            dest++; 
-        }
-        src++;
-    }
-    *dest = '\0';
-
-    while(str = strstr(str, "    ")) memmove(str, str + 4, 1 + strlen(str + 4));
-
-    return str;
+    replace(str, "    ", "");
+    replace(str, "   ", "");
+    replace(str, "  ", "");
+    replace(str, "\t", "");
 }
 
 void execute_command(const char *command, int type)
@@ -64,11 +69,12 @@ void execute_command(const char *command, int type)
     
     while(fgets(line, sizeof(char) * BUFFER_SIZE, fpipe))
     {
-	if(!computer[type][0]) strncpy(computer[type], line, sizeof(line));
-	else strcat(computer[type], line);
+	if (strstr(line, "Error") == NULL && strstr(line, "[Empty]") == NULL
+	&& strstr(line, "Unknown") == NULL && strstr(line, "No Module") == NULL)
+		strcat(computer[type], line);
     }
 
-    //clean(computer[type]);
+    clean(computer[type]);
 
     pclose(fpipe);
 }
@@ -86,6 +92,16 @@ int main(int argc, char **argv)
     for(int i = 0; i <= BIOS; i++)
     {
         execute_command(commands[i], i);
+	switch(i)
+	{
+		case CPU: printf("------CPU------\n"); break;
+		case GPU: printf("------GPU------\n"); break;
+		case RAM: printf("------RAM------\n"); break;
+		case DISK: printf("------DISK------\n"); break;
+		case MOTHERBOARD: printf("------MOTHERBOARD------\n"); break;
+		case SYSTEM: printf("------SYSTEM------\n"); break;
+		case BIOS: printf("------BIOS------\n"); break;
+	}
         printf(computer[i]);
     }
 
