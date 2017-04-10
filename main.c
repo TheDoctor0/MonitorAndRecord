@@ -20,34 +20,11 @@ const char commands[][BUFFER_SIZE/4] =
 
 char computer[BIOS][BUFFER_SIZE];
 
-char xml[][BUFFER_SIZE*4];
-
-void make_xml()
-{
-    xml += "<host>";
-    
-    for(int i = 0; i <= BIOS; i++)
-    {
-	switch(i)
-	{
-            case CPU: xml += "<cpu>" + computer[CPU] + "</cpu>"; break;
-            case GPU: xml += "<gpu>" + computer[CPU] + "</gpu>"; break;
-            case RAM: xml += "<ram>" + computer[CPU] + "</ram>"; break;
-            case DISK: xml += "<disk>" + computer[CPU] + "</disk>"; break;
-            case MOTHERBOARD: xml += "<motherboard>" + computer[CPU] + "</motherboard>"; break;
-            case SYSTEM: xml += "<system>" + computer[CPU] + "</system>"; break;
-            case BIOS: xml += "<bios>" + computer[CPU] + "</bios>"; break;
-	}
-
-	printf(computer[i]);
-    }
-    
-    xml += "</host>";
-}
+char xml[BUFFER_SIZE*4];
 
 void clean(char *target)
 {
-	const char replacement[][5] = { { "	" }, { "   " }, { "  " }, { "\t" } };
+	const char replacement[][5] = { { "    " }, { "   " }, { "  " }, { "\t" } };
 
 	for(int i = 0; i < 4; i++)
 	{
@@ -102,6 +79,29 @@ void execute_command(const char *command, int type)
 	pclose(fpipe);
 }
 
+void make_xml()
+{
+    strcat(xml,"<host>\n");
+    
+    for(int i = 0; i <= BIOS; i++)
+    {
+        execute_command(commands[i], i);
+
+	switch(i)
+	{
+            case CPU: strcat(xml, "<cpu>\n"); strcat(xml, computer[CPU]); strcat(xml, "</cpu>\n"); break;
+            case GPU: strcat(xml, "<gpu>\n"); strcat(xml, computer[GPU]); strcat(xml,"</gpu>\n"); break;
+            case RAM: strcat(xml, "<ram>\n"); strcat(xml, computer[RAM]); strcat(xml,"</ram>\n"); break;
+            case DISK: strcat(xml, "<disk>\n"); strcat(xml, computer[DISK]); strcat(xml,"</disk>\n"); break;
+            case MOTHERBOARD: strcat(xml, "<motherboard>\n"); strcat(xml, computer[MOTHERBOARD]); strcat(xml,"</motherboard>\n"); break;
+            case SYSTEM: strcat(xml, "<system>\n"); strcat(xml, computer[SYSTEM]); strcat(xml,"</system>\n"); break;
+            case BIOS: strcat(xml, "<bios>\n"); strcat(xml, computer[BIOS]); strcat(xml,"</bios>\n"); break;
+	}
+    }
+    
+    strcat(xml,"</host>\n");
+}
+
 int main(int argc, char **argv)
 {
 	int result = system("lshw &>/dev/null");
@@ -111,24 +111,6 @@ int main(int argc, char **argv)
 		printf("lshw package is not installed\n");
 
 		exit(1);
-	}
-	
-	for(int i = 0; i <= BIOS; i++)
-	{
-		execute_command(commands[i], i);
-
-		switch(i)
-		{
-			case CPU: printf("------CPU------\n"); break;
-			case GPU: printf("------GPU------\n"); break;
-			case RAM: printf("------RAM------\n"); break;
-			case DISK: printf("------DISK------\n"); break;
-			case MOTHERBOARD: printf("------MOTHERBOARD------\n"); break;
-			case SYSTEM: printf("------SYSTEM------\n"); break;
-			case BIOS: printf("------BIOS------\n"); break;
-		}
-
-		printf(computer[i]);
 	}
         
         make_xml();
