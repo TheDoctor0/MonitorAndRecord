@@ -20,40 +20,37 @@ const char commands[][BUFFER_SIZE/4] =
 
 char computer[BIOS][BUFFER_SIZE];
 
-void replace(char *target, const char *needle, const char *replacement)
+void clean(char *target)
 {
-    char buffer[BUFFER_SIZE] = { 0 };
-    char *insert_point = &buffer[0];
-    const char *tmp = target;
-    size_t needle_len = strlen(needle);
-    size_t repl_len = strlen(replacement);
+    const char replacement[][5] = { { "    " }, { "   " }, { "  " }, { "\t" } };
 
-    while (1) {
-        const char *p = strstr(tmp, needle);
+    for(int i = 0; i < 4; i++)
+    {
+        char buffer[BUFFER_SIZE] = { 0 };
+        char *insert_point = &buffer[0];
+        const char *tmp = target;
+        size_t replacement_len = strlen(replacement[i]);
 
-        if (p == NULL) {
-            strcpy(insert_point, tmp);
-            break;
+        while (1) 
+        {
+            const char *p = strstr(tmp, replacement[i]);
+
+            if (p == NULL) 
+            {
+                strcpy(insert_point, tmp);
+                break;
+            }
+
+            memcpy(insert_point, tmp, p - tmp);
+            insert_point += p - tmp;
+
+            memcpy(insert_point, "", 0);
+
+           tmp = p + replacement_len;
         }
 
-        memcpy(insert_point, tmp, p - tmp);
-        insert_point += p - tmp;
-
-        memcpy(insert_point, replacement, repl_len);
-        insert_point += repl_len;
-
-        tmp = p + needle_len;
+        strcpy(target, buffer);
     }
-
-    strcpy(target, buffer);
-}
-
-char *clean(char *str)
-{
-    replace(str, "    ", "");
-    replace(str, "   ", "");
-    replace(str, "  ", "");
-    replace(str, "\t", "");
 }
 
 void execute_command(const char *command, int type)
