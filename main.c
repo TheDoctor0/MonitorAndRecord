@@ -20,6 +20,31 @@ const char commands[][BUFFER_SIZE/4] =
 
 char computer[BIOS][BUFFER_SIZE];
 
+char xml[][BUFFER_SIZE*4];
+
+void make_xml()
+{
+    xml += "<host>";
+    
+    for(int i = 0; i <= BIOS; i++)
+    {
+	switch(i)
+	{
+            case CPU: xml += "<cpu>" + computer[CPU] + "</cpu>"; break;
+            case GPU: xml += "<gpu>" + computer[CPU] + "</gpu>"; break;
+            case RAM: xml += "<ram>" + computer[CPU] + "</ram>"; break;
+            case DISK: xml += "<disk>" + computer[CPU] + "</disk>"; break;
+            case MOTHERBOARD: xml += "<motherboard>" + computer[CPU] + "</motherboard>"; break;
+            case SYSTEM: xml += "<system>" + computer[CPU] + "</system>"; break;
+            case BIOS: xml += "<bios>" + computer[CPU] + "</bios>"; break;
+	}
+
+	printf(computer[i]);
+    }
+    
+    xml += "</host>";
+}
+
 void clean(char *target)
 {
 	const char replacement[][5] = { { "	" }, { "   " }, { "  " }, { "\t" } };
@@ -105,6 +130,10 @@ int main(int argc, char **argv)
 
 		printf(computer[i]);
 	}
+        
+        make_xml();
+        
+        printf(xml);
 
 	return 0;
 }
