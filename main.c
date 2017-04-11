@@ -24,7 +24,7 @@ char xml[BUFFER_SIZE * 4];
 
 void clean(char *target) 
 {
-    const char replacement[][5] = { { "    " }, { "   " }, { "  " }, { "\t" } };
+    const char replacement[][5] = { "    ", "   ", "  ", "\t" };
 
     for (int i = 0; i < 4; i++) 
     {
@@ -128,6 +128,13 @@ void send_xml()
 {
     make_xml();
 
+    char *temp = strdup(xml);
+
+    strcpy(xml, "xml=");
+    strcat(xml, temp);
+
+    free(temp);
+
     CURL *curl;
     CURLcode res;
  
@@ -136,6 +143,7 @@ void send_xml()
     if(curl) 
     {
         curl_easy_setopt(curl, CURLOPT_URL, "http://ewidencja.5v.pl");
+
         curl_easy_setopt(curl, CURLOPT_POSTFIELDS, xml);
  
         curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, (long)strlen(xml));
