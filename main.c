@@ -19,12 +19,12 @@ const char commands[][BUFFER_SIZE / 4] =
     { "sudo dmidecode -t bios | grep -E 'Vendor|Version|Date|Revision'"}
 };
 
-char computer[BIOS][BUFFER_SIZE];
+char computer[BIOS + 1][BUFFER_SIZE];
 char xml[BUFFER_SIZE * 4];
 
 void clean(char *target) 
 {
-    const char replacement[][5] = { "    ", "   ", "  ", "\t" };
+    const char replacement[][5] = { { "    " }, { "   " }, { "  " }, { "\t" } };
 
     for (int i = 0; i < 4; i++) 
     {
@@ -59,7 +59,7 @@ void clean(char *target)
 void execute_command(const char *command, int type) 
 {
     FILE *fpipe;
-    char line[BUFFER_SIZE / 4];
+    char line[BUFFER_SIZE / 2];
 
     if (!(fpipe = (FILE*) popen(command, "r"))) 
     {
@@ -127,7 +127,7 @@ void make_xml()
 void send_xml()
 {
     make_xml();
-    
+
     CURL *curl;
     CURLcode res;
  
@@ -137,7 +137,7 @@ void send_xml()
     {
         curl_easy_setopt(curl, CURLOPT_URL, "http://ewidencja.5v.pl");
         curl_easy_setopt(curl, CURLOPT_POSTFIELDS, xml);
-  
+ 
         curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, (long)strlen(xml));
  
         res = curl_easy_perform(curl);
@@ -146,8 +146,6 @@ void send_xml()
  
         curl_easy_cleanup(curl);
     }
-    
-    return 0;
 }
 
 int main(int argc, char **argv) 
@@ -162,8 +160,6 @@ int main(int argc, char **argv)
     }
 
     send_xml();
-
-    printf(xml);
 
     return 0;
 }
