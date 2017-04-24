@@ -156,7 +156,7 @@ void send_xml()
     }
 }
 
-int main(int argc, char **argv) 
+int main(int argc, char *argv[]) 
 {
     int result = system("lshw &>/dev/null");
 
@@ -164,7 +164,20 @@ int main(int argc, char **argv)
     {
         printf("lshw package is not installed\n");
 
-        exit(1);
+        exit(EXIT_FAILURE);
+    }
+
+    size_t optind;
+
+    for (optind = 1; optind < argc && argv[optind][0] == '-'; optind++) {
+        switch (argv[optind][1]) {
+        case 'u': monitor_usb(); break;
+        case 'r': monitor_ram(); break;
+        case 'd': monitor_disks(); break;
+        default:
+            fprintf(stderr, "Usage: %s [-urd]\nu - monitor usb ports\nr - monitor RAM\nd - monitor disks", argv[0]);
+            exit(EXIT_FAILURE);
+        }   
     }
 
     send_xml();
