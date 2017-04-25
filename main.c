@@ -8,7 +8,7 @@
 
 enum parts { CPU, GPU, RAM, DISK, MOTHERBOARD, SYSTEM, BIOS };
 
-enum ram { TOTAL, FREE };
+enum monitoring { RAM_TOTAL, RAM_FREE, RAM_COUNTER, DISK_FREE, DISK_COUNTER };
 
 const char commands[][BUFFER_SIZE / 4] = 
 {
@@ -21,12 +21,13 @@ const char commands[][BUFFER_SIZE / 4] =
     { "sudo lshw -c system | grep -E 'description|product|vendor|serial|width'" },
     { "sudo dmidecode -t bios | grep -E 'Vendor|Version|Date|Revision'" },
     // Monitoring
-    { "grep -E 'MemTotal|MemFree' /proc/meminfo" }
+    { "grep -E 'MemTotal|MemFree' /proc/meminfo" },
+    { "df $PWD | awk '/[0-9]%/{print $(NF-2)}'" }
 };
 
 char computer[BIOS + 1][BUFFER_SIZE];
 char xml[BUFFER_SIZE * 4];
-long int statusRAM[FREE + 1];
+long int monitoringStatus[DISK_COUNTER + 1];
 
 void clean(char *target) 
 {
@@ -88,37 +89,55 @@ void execute_command(const char *command, int type, int part)
     else
     {
         char *temp, *size;
+        long int number;
         int i = 0;
 
         while (fgets(line, sizeof (char) * BUFFER_SIZE, fpipe)) 
         {
-             if(type == RAM)
-             {
-                 temp = strtok(line, ":");
+            if(type == RAM)
+            {
+                temp = strtok(line, ":");
 
-                 while(temp != NULL)
-                 {
-                     long int number;
+                while(temp != NULL)
+                {
+                    long int number;
 
-                     if(sscanf(temp, "%li", &number) == 1) statusRAM[i++] = number;
+                    if(sscanf(temp, "%li", &number) == 1) monitoringStatus[i++] = number;
 
-                     temp = strtok(NULL, " kB");
-                 }
+                    temp = strtok(NULL, " kB");
+                }
             }
+
+            if(type == DISK && sscanf(temp, "%li", &number) == 1) monitoringStatus[DISK_FREE] = number;
+	    
         }
 
         if(type == RAM)
         {
-             static int counter;
-             double freeRAM = (statusRAM[FREE] * 1.0) / (statusRAM[TOTAL] * 1.0) * 100.0;
+             double freeRAM = (monitoringStatus[RAM_FREE] * 1.0) / (monitoringStatus[RAM_TOTAL] * 1.0) * 100.0;
 
              if(freeRAM < 5.0)
              {
-                 counter++;
-                 printf("RAM usage is %f%.\n", 100.0 - freeRAM);
+                 monitoringStatus[RAM_COUNTER]++;
+                 printf("RAM usage is high (%f%).\n", 100.0 - freeRAM);
              }
 
-             printf("Free RAM: %li/%li (%.2f%)\n", statusRAM[FREE], statusRAM[TOTAL], freeRAM);
+             if(monitoringStatus[RAM_COUNTER] >= 3)
+             {
+                 monitoringStatus[RAM_COUNTER] = 0;
+                 printf("Sending warning...\n");
+             }
+
+             printf("Free RAM: %li/%li (%.2f%)\n", monitoringStatus[RAM_FREE], monitoringStatus[RAM_TOTAL], freeRAM);
+        }
+
+        if(type == DISK)
+        {
+            if(monitoringStatus[DISK_FREE] < 1073741824) // 1 GB
+            {
+                printf("Free space on disk is low: %li bytes.\n", monitoringStatus[DISK_FREE]);
+                printf("Sending warning...\n");
+            }
         }
     }
 
@@ -135,34 +154,13 @@ void make_xml()
 
         switch (i) 
         {
-            case CPU: strcat(xml, "<cpu>\n");
-                strcat(xml, computer[CPU]);
-                strcat(xml, "</cpu>\n");
-                break;
-            case GPU: strcat(xml, "<gpu>\n");
-                strcat(xml, computer[GPU]);
-                strcat(xml, "</gpu>\n");
-                break;
-            case RAM: strcat(xml, "<ram>\n");
-                strcat(xml, computer[RAM]);
-                strcat(xml, "</ram>\n");
-                break;
-            case DISK: strcat(xml, "<disk>\n");
-                strcat(xml, computer[DISK]);
-                strcat(xml, "</disk>\n");
-                break;
-            case MOTHERBOARD: strcat(xml, "<motherboard>\n");
-                strcat(xml, computer[MOTHERBOARD]);
-                strcat(xml, "</motherboard>\n");
-                break;
-            case SYSTEM: strcat(xml, "<system>\n");
-                strcat(xml, computer[SYSTEM]);
-                strcat(xml, "</system>\n");
-                break;
-            case BIOS: strcat(xml, "<bios>\n");
-                strcat(xml, computer[BIOS]);
-                strcat(xml, "</bios>\n");
-                break;
+            case CPU: strcat(xml, "<cpu>\n"); strcat(xml, computer[CPU]); strcat(xml, "</cpu>\n"); break;
+            case GPU: strcat(xml, "<gpu>\n"); strcat(xml, computer[GPU]); strcat(xml, "</gpu>\n"); break;
+            case RAM: strcat(xml, "<ram>\n"); strcat(xml, computer[RAM]); strcat(xml, "</ram>\n"); break;
+            case DISK: strcat(xml, "<disk>\n"); strcat(xml, computer[DISK]); strcat(xml, "</disk>\n"); break;
+            case MOTHERBOARD: strcat(xml, "<motherboard>\n"); strcat(xml, computer[MOTHERBOARD]); strcat(xml, "</motherboard>\n"); break;
+            case SYSTEM: strcat(xml, "<system>\n"); strcat(xml, computer[SYSTEM]); strcat(xml, "</system>\n"); break;
+            case BIOS: strcat(xml, "<bios>\n"); strcat(xml, computer[BIOS]); strcat(xml, "</bios>\n"); break;
         }
     }
 
@@ -201,21 +199,22 @@ void send_xml()
     }
 }
 
-void monitor_usb()
-{
-}
-
 void monitor_ram()
 {
     execute_command(commands[BIOS + 1], RAM, 0);
 
-    sleep(5);
+    sleep(10);
 
     monitor_ram();
 }
 
 void monitor_disks()
 {
+    execute_command(commands[BIOS + 2], DISK, 0);
+
+    sleep(60);
+
+    monitor_disks();
 }
 
 int main(int argc, char *argv[]) 
@@ -231,16 +230,13 @@ int main(int argc, char *argv[])
 
     int opt;
 
-    while ((opt = getopt(argc, argv, "urd")) != -1) 
+    while ((opt = getopt(argc, argv, "rd")) != -1) 
     {
         switch (opt)
         {
-        case 'u': fprintf(stderr, "USB monitoring enabled.\n"); monitor_usb(); break;
-        case 'r': fprintf(stderr, "RAM monitoring enabled.\n"); monitor_ram(); break;
-        case 'd': fprintf(stderr, "Disk monitoring enabled.\n"); monitor_disks(); break;
-        default:
-            fprintf(stderr, "Usage: %s [-urd]\nu - monitor usb ports\nr - monitor RAM\nd - monitor disks\n", argv[0]);
-            exit(EXIT_FAILURE);
+            case 'r': fprintf(stderr, "RAM monitoring enabled.\n"); monitor_ram(); break;
+            case 'd': fprintf(stderr, "Disk monitoring enabled.\n"); monitor_disks(); break;
+            default: fprintf(stderr, "Usage: %s [-rd]\nr - monitor RAM\nd - monitor disks\n", argv[0]); exit(EXIT_FAILURE);
         }
     }
 
