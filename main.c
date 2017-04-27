@@ -3,6 +3,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <curl/curl.h>
+#include <pthread.h>
 
 #define BUFFER_SIZE 1024
 
@@ -72,7 +73,7 @@ void execute_part_command(int part)
 
     if (!(fpipe = (FILE*) popen(part_commands[part], "r"))) 
     {
-        perror("Command cannot be executed");
+        fprintf(stderr, "Command cannot be executed");
 
         exit(1);
     }
@@ -94,32 +95,33 @@ void execute_monitoring_command(int monitoring)
 
     if (!(fpipe = (FILE*) popen(monitoring_commands[monitoring], "r"))) 
     {
-        perror("Command cannot be executed");
+        fprintf(stderr, "Command cannot be executed");
 
         exit(1);
     }
     
     char *tempString, *size;
     long int tempSize;
+    int i = 0;
 
-    while (fgets(commandLine, sizeof (char) * BUFFER_SIZE, fpipe)) 
+    while(fgets(commandLine, sizeof (char) * BUFFER_SIZE, fpipe)) 
     {
-        if(monitoring == RAM)
+        if(monitoring == RAM_MONITORING)
         {
             tempString = strtok(commandLine, ":");
 
             while(tempString != NULL)
             {
-                if(sscanf(tempString, "%li", &tempSize) == 1) monitoringStatus[i++] = tempSize;
+                if(sscanf(tempString, "%li", &tempSize) == 1) monitoringStatus[RAM_TOTAL + i++] = tempSize;
 
                 tempString = strtok(NULL, " kB");
             }
         }
 
-        if(monitoring == DISK && sscanf(commandLine, "%li", &tempSize) == 1) monitoringStatus[DISK_FREE] = tempSize;    
+        if(monitoring == DISK_MONITORING && sscanf(commandLine, "%li", &tempSize) == 1) monitoringStatus[DISK_FREE] = tempSize;    
     }
 
-    if(monitoring == RAM)
+    if(monitoring == RAM_MONITORING)
     {
         double freeRAM = (monitoringStatus[RAM_FREE] * 1.0) / (monitoringStatus[RAM_TOTAL] * 1.0) * 100.0;
 
@@ -138,7 +140,7 @@ void execute_monitoring_command(int monitoring)
         printf("Free RAM: %li/%li (%.2f%)\n", monitoringStatus[RAM_FREE], monitoringStatus[RAM_TOTAL], freeRAM);
     }
 
-    if(monitoring == DISK)
+    if(monitoring == DISK_MONITORING)
     {
         if(monitoringStatus[DISK_FREE] < 1073741824) // 1 GB
         {
@@ -205,22 +207,22 @@ void send_xml()
     }
 }
 
-void monitor_ram()
+void* monitor_ram(void *arg)
 {
     execute_monitoring_command(RAM_MONITORING);
 
     sleep(10);
 
-    monitor_ram();
+    monitor_ram(0);
 }
 
-void monitor_disks()
+void* monitor_disk(void *arg)
 {
     execute_monitoring_command(DISK_MONITORING);
 
     sleep(60);
 
-    monitor_disks();
+    monitor_disk(0);
 }
 
 int main(int argc, char *argv[]) 
@@ -234,19 +236,63 @@ int main(int argc, char *argv[])
         exit(EXIT_FAILURE);
     }
 
-    int opt;
+    int opt, error, monitoring;
+    pthread_t thread_monitor_ram, thread_monitor_disk;
 
     while ((opt = getopt(argc, argv, "rd")) != -1) 
     {
         switch (opt)
         {
-            case 'r': fprintf(stderr, "RAM monitoring enabled.\n"); monitor_ram(); break;
-            case 'd': fprintf(stderr, "Disk monitoring enabled.\n"); monitor_disks(); break;
-            default: fprintf(stderr, "Usage: %s [-rd]\nr - monitor RAM\nd - monitor disks\n", argv[0]); exit(EXIT_FAILURE);
+            case 'r':
+            {
+                error = pthread_create(&thread_monitor_ram, NULL, &monitor_ram, NULL);
+
+		if(error != 0)
+                {
+                    fprintf(stderr, "Cannot create thread for RAM monitoring: [%s]", strerror(error));
+
+                    exit(EXIT_FAILURE);
+                }
+                else
+                {
+                    printf("RAM monitoring enabled.\n");
+
+                    monitoring++;
+                }
+
+		break;
+            }
+            case 'd':
+            {
+		error = pthread_create(&thread_monitor_disk, NULL, &monitor_disk, NULL);
+
+		if(error != 0)
+                {
+                    fprintf(stderr, "Cannot create thread for Disk monitoring: [%s]", strerror(error));
+
+                    exit(EXIT_FAILURE);
+                }
+		else
+                {
+                    printf("Disk monitoring enabled.\n");
+
+                    monitoring++;
+                }
+
+		break;
+            }
+            default: printf("Usage: %s [-rd]\nr - monitor RAM\nd - monitor disks\n", argv[0]); exit(EXIT_FAILURE);
         }
     }
 
     send_xml();
+
+    if(monitoring)
+    {
+        pthread_join(thread_monitor_ram, NULL);
+
+        pthread_join(thread_monitor_disk, NULL);
+    }
 
     return 0;
 }
