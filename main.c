@@ -8,19 +8,21 @@
 
 enum parts { CPU, GPU, RAM, DISK, MOTHERBOARD, SYSTEM, BIOS };
 
-enum monitoring { RAM_TOTAL, RAM_FREE, RAM_COUNTER, DISK_FREE, DISK_COUNTER };
+enum monitoring { RAM_MONITORING, DISK_MONITORING, RAM_TOTAL, RAM_FREE, RAM_COUNTER, DISK_FREE, DISK_COUNTER };
 
-const char commands[][BUFFER_SIZE / 4] = 
+const char part_commands[][BUFFER_SIZE / 4] = 
 {
-    // Parts
     { "lscpu | grep -E 'Architecture|CPU(s)|Vendor ID|Model name|CPU min MHz|CPU max MHz'" },
     { "sudo lspci | grep -E -o '.{0,0}VGA.{0,200}'" },
     { "sudo dmidecode -t memory | grep -E 'Size:|Type:|Speed:|Manufacturer|Serial|Part'" },
     { "sudo lshw -class volume | grep -E 'description|vendor|serial|capacity'" },
     { "sudo dmidecode -t baseboard | grep -E 'Product|Manufacturer|Serial'" },
     { "sudo lshw -c system | grep -E 'description|product|vendor|serial|width'" },
-    { "sudo dmidecode -t bios | grep -E 'Vendor|Version|Date|Revision'" },
-    // Monitoring
+    { "sudo dmidecode -t bios | grep -E 'Vendor|Version|Date|Revision'" }
+};
+
+const char monitoring_commands[][BUFFER_SIZE / 4] =
+{
     { "grep -E 'MemTotal|MemFree' /proc/meminfo" },
     { "df $PWD | awk '/[0-9]%/{print $(NF-2)}'" }
 };
@@ -63,81 +65,85 @@ void clean(char *target)
     }
 }
 
-void execute_command(const char *command, int type, int part) 
+void execute_part_command(int part) 
 {
     FILE *fpipe;
-    char line[BUFFER_SIZE / 2];
+    char commandLine[BUFFER_SIZE / 2];
 
-    if (!(fpipe = (FILE*) popen(command, "r"))) 
+    if (!(fpipe = (FILE*) popen(part_commands[part], "r"))) 
     {
         perror("Command cannot be executed");
 
         exit(1);
     }
 
-    if(part)
+    while (fgets(commandLine, sizeof (char) * BUFFER_SIZE, fpipe)) 
     {
-        while (fgets(line, sizeof (char) * BUFFER_SIZE, fpipe)) 
-        {
-            if (strstr(line, "Error") == NULL && strstr(line, "[Empty]") == NULL
-            && strstr(line, "Unknown") == NULL && strstr(line, "No Module") == NULL)
-                strcat(computer[type], line);
-        }
-
-        clean(computer[type]);
+        if (strstr(commandLine, "Error") == NULL && strstr(commandLine, "[Empty]") == NULL
+        && strstr(commandLine, "Unknown") == NULL && strstr(commandLine, "No Module") == NULL)
+            strcat(computer[part], commandLine);
     }
-    else
+
+    clean(computer[part]);
+}
+
+void execute_monitoring_command(int monitoring)
+{
+    FILE *fpipe;
+    char commandLine[BUFFER_SIZE / 2];
+
+    if (!(fpipe = (FILE*) popen(monitoring_commands[monitoring], "r"))) 
     {
-        char *temp, *size;
-        long int number;
-        int i = 0;
+        perror("Command cannot be executed");
 
-        while (fgets(line, sizeof (char) * BUFFER_SIZE, fpipe)) 
+        exit(1);
+    }
+    
+    char *tempString, *size;
+    long int tempSize;
+
+    while (fgets(commandLine, sizeof (char) * BUFFER_SIZE, fpipe)) 
+    {
+        if(monitoring == RAM)
         {
-            if(type == RAM)
+            tempString = strtok(commandLine, ":");
+
+            while(tempString != NULL)
             {
-                temp = strtok(line, ":");
+                if(sscanf(tempString, "%li", &tempSize) == 1) monitoringStatus[i++] = tempSize;
 
-                while(temp != NULL)
-                {
-                    long int number;
-
-                    if(sscanf(temp, "%li", &number) == 1) monitoringStatus[i++] = number;
-
-                    temp = strtok(NULL, " kB");
-                }
+                tempString = strtok(NULL, " kB");
             }
-
-            if(type == DISK && sscanf(temp, "%li", &number) == 1) monitoringStatus[DISK_FREE] = number;
-	    
         }
 
-        if(type == RAM)
+        if(monitoring == DISK && sscanf(commandLine, "%li", &tempSize) == 1) monitoringStatus[DISK_FREE] = tempSize;    
+    }
+
+    if(monitoring == RAM)
+    {
+        double freeRAM = (monitoringStatus[RAM_FREE] * 1.0) / (monitoringStatus[RAM_TOTAL] * 1.0) * 100.0;
+
+        if(freeRAM < 5.0)
         {
-             double freeRAM = (monitoringStatus[RAM_FREE] * 1.0) / (monitoringStatus[RAM_TOTAL] * 1.0) * 100.0;
-
-             if(freeRAM < 5.0)
-             {
-                 monitoringStatus[RAM_COUNTER]++;
-                 printf("RAM usage is high (%f%).\n", 100.0 - freeRAM);
-             }
-
-             if(monitoringStatus[RAM_COUNTER] >= 3)
-             {
-                 monitoringStatus[RAM_COUNTER] = 0;
-                 printf("Sending warning...\n");
-             }
-
-             printf("Free RAM: %li/%li (%.2f%)\n", monitoringStatus[RAM_FREE], monitoringStatus[RAM_TOTAL], freeRAM);
+            monitoringStatus[RAM_COUNTER]++;
+            printf("RAM usage is high (%f%).\n", 100.0 - freeRAM);
         }
 
-        if(type == DISK)
+        if(monitoringStatus[RAM_COUNTER] >= 3)
         {
-            if(monitoringStatus[DISK_FREE] < 1073741824) // 1 GB
-            {
-                printf("Free space on disk is low: %li bytes.\n", monitoringStatus[DISK_FREE]);
-                printf("Sending warning...\n");
-            }
+            monitoringStatus[RAM_COUNTER] = 0;
+            printf("Sending warning...\n");
+        }
+
+        printf("Free RAM: %li/%li (%.2f%)\n", monitoringStatus[RAM_FREE], monitoringStatus[RAM_TOTAL], freeRAM);
+    }
+
+    if(monitoring == DISK)
+    {
+        if(monitoringStatus[DISK_FREE] < 1073741824) // 1 GB
+        {
+            printf("Free space on disk is low: %li bytes.\n", monitoringStatus[DISK_FREE]);
+            printf("Sending warning...\n");
         }
     }
 
@@ -150,7 +156,7 @@ void make_xml()
 
     for (int i = 0; i <= BIOS; i++) 
     {
-        execute_command(commands[i], i, 1);
+        execute_part_command(i);
 
         switch (i) 
         {
@@ -201,7 +207,7 @@ void send_xml()
 
 void monitor_ram()
 {
-    execute_command(commands[BIOS + 1], RAM, 0);
+    execute_monitoring_command(RAM_MONITORING);
 
     sleep(10);
 
@@ -210,7 +216,7 @@ void monitor_ram()
 
 void monitor_disks()
 {
-    execute_command(commands[BIOS + 2], DISK, 0);
+    execute_monitoring_command(DISK_MONITORING);
 
     sleep(60);
 
