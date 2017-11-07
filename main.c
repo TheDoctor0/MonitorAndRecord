@@ -66,6 +66,26 @@ void clean(char *target)
     }
 }
 
+void send_warning(type)
+{
+    CURL *curl;
+    CURLcode res;
+ 
+    curl = curl_easy_init();
+  
+    if(curl) 
+    {
+	if(type == RAM_MONITORING) curl_easy_setopt(curl, CURLOPT_URL, "http://localhost/warning/ram");
+	else curl_easy_setopt(curl, CURLOPT_URL, "http://localhost/warning/disk");
+ 
+        res = curl_easy_perform(curl);
+
+        if(res != CURLE_OK) fprintf(stderr, "curl_easy_perform() failed: %s\n", curl_easy_strerror(res));
+ 
+        curl_easy_cleanup(curl);
+    }
+}
+
 void execute_part_command(int part) 
 {
     FILE *fpipe;
@@ -128,13 +148,17 @@ void execute_monitoring_command(int monitoring)
         if(freeRAM < 5.0)
         {
             monitoringStatus[RAM_COUNTER]++;
+
             printf("RAM usage is high (%f%).\n", 100.0 - freeRAM);
         }
 
         if(monitoringStatus[RAM_COUNTER] >= 3)
         {
             monitoringStatus[RAM_COUNTER] = 0;
+
             printf("Sending warning...\n");
+
+	    send_warning(RAM_MONITORING);
         }
 
         printf("Free RAM: %li/%li (%.2f%)\n", monitoringStatus[RAM_FREE], monitoringStatus[RAM_TOTAL], freeRAM);
@@ -146,6 +170,8 @@ void execute_monitoring_command(int monitoring)
         {
             printf("Free space on disk is low: %li bytes.\n", monitoringStatus[DISK_FREE]);
             printf("Sending warning...\n");
+
+	    send_warning(DISK_MONITORING);
         }
     }
 
@@ -193,10 +219,8 @@ void send_xml()
   
     if(curl) 
     {
-        curl_easy_setopt(curl, CURLOPT_URL, "http://ewidencja.5v.pl");
-
+        curl_easy_setopt(curl, CURLOPT_URL, "http://localhost");
         curl_easy_setopt(curl, CURLOPT_POSTFIELDS, xml);
- 
         curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, (long)strlen(xml));
  
         res = curl_easy_perform(curl);
@@ -290,7 +314,6 @@ int main(int argc, char *argv[])
     if(monitoring)
     {
         pthread_join(thread_monitor_ram, NULL);
-
         pthread_join(thread_monitor_disk, NULL);
     }
 
